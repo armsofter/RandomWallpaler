@@ -20,15 +20,17 @@ import (
 var (
 	// Command line flags
 	outputFile string
-	updateTime string
+	updateHour string
 	killFlag   bool
+	source     string
 )
 
 const maxFetchingCount int = 8
-
+//https://unsplash.it/3840/2160/?random
 func init() {
 	flag.StringVar(&outputFile, "o", "", "output file for logs")
-	flag.StringVar(&updateTime, "t", "08:00", "24-hour time when wallpaper is updated")
+	flag.StringVar(&source, "s", "rand", "bing: gets photos from Bing.com (max 8 for day) \n rand: or gets photos unsplash.it 4k random wallpaper")
+	flag.StringVar(&updateHour, "h", "10", "24-hour time when wallpaper is updated")
 	flag.BoolVar(&killFlag, "k", false, "update wallpaper once and exit")
 
 	flag.Usage = usage
@@ -55,7 +57,7 @@ func main() {
 		output = f
 	}
 
-	log.SetPrefix("[bingo] ")
+	log.SetPrefix("[RandomWallpaler] ")
 	log.SetOutput(output)
 
 	start()
@@ -63,7 +65,13 @@ func main() {
 
 func start() {
 	// set first time on launch
-	setBingWallpaper()
+	if source == "bing" {
+		fmt.Println("Bing source selected")
+		setBingWallpaper()
+	} else if source == "rand" {
+		fmt.Println("unsp selected")
+		setUnspWallpaper()
+	}
 
 	if killFlag {
 		log.Printf("[INF] kill flag provided, exiting")
@@ -71,11 +79,12 @@ func start() {
 	}
 
 	// set again daily
-	if err := gocron.Every(1).Day().At(updateTime).Do(setBingWallpaper); err != nil {
-		log.Printf("[ERR] failed to create daily update job at %q: %v", updateTime, err)
+	hour, _ := strconv.ParseUint(updateHour, 10, 64)
+	if err := gocron.Every(hour).Seconds().Do(setBingWallpaper); err != nil {
+		log.Printf("[ERR] failed to create daily update job at %q: %v", updateHour, err)
 		os.Exit(1)
 	}
-	log.Printf("[INF] wallpaper will be updated again daily at %s", updateTime)
+	log.Printf("[INF] wallpaper will be updated again in every %s hour", updateHour)
 
 	<-gocron.Start()
 }
@@ -96,6 +105,20 @@ func setBingWallpaper() {
 		log.Printf("[ERR] unable to set wallpaper: %v", err)
 	}
 }
+
+
+// setUnspWallpaper sets the wallpaper to https://unsplash.it random 4k photo
+// if it fails an error is logged.
+func setUnspWallpaper() {
+	image := image{URL: "https://unsplash.it/3840/2160/?random", Copyright:"None"}
+	image.URL = image.URL + "/fakefilename=2020.jpg"
+	log.Printf("[INF] updating wallpaper, url: %q, copyright: %q", image.URL, image.Copyright)
+
+	if err := wallpaper.SetFromURL(image.URL); err != nil {
+		log.Printf("[ERR] unable to set wallpaper: %v", err)
+	}
+}
+
 
 var client = http.Client{Timeout: 30 * time.Second}
 
