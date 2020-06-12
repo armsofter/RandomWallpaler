@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/jasonlvhit/gocron"
@@ -21,6 +23,8 @@ var (
 	updateTime string
 	killFlag   bool
 )
+
+const maxFetchingCount int = 8
 
 func init() {
 	flag.StringVar(&outputFile, "o", "", "output file for logs")
@@ -102,7 +106,8 @@ type image struct {
 
 // bingImageOfTheDay returns Bing's current image of the day.
 func bingImageOfTheDay() (*image, error) {
-	resp, err := client.Get("https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1")
+	url := "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n="+ strconv.Itoa(maxFetchingCount)
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("http GET: %v", err)
 	}
@@ -115,12 +120,28 @@ func bingImageOfTheDay() (*image, error) {
 		return nil, fmt.Errorf("decode body: %v", err)
 	}
 
-	if len(root.Images) == 0 {
+	if len(root.Images) > maxFetchingCount {
 		return nil, errors.New("response does not contain an image")
 	}
 
-	image := root.Images[0]
+	randomIndex := getRandInRange(0, maxFetchingCount)
+	image := root.Images[randomIndex]
 	image.URL = "https://www.bing.com" + image.URL
 
 	return &image, nil
+}
+
+type IntRange struct {
+	min, max int
+}
+
+// get next random value within the interval including min and max
+func (ir *IntRange) NextRandom(r* rand.Rand) int {
+	return r.Intn(ir.max - ir.min +1) + ir.min
+}
+
+func getRandInRange(min int, max int) int {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	ir := IntRange{min, max}
+	return ir.NextRandom(r)
 }
