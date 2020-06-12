@@ -4,7 +4,7 @@ Sync your wallpaper with Bing's image of the day, every day.
 
 # Installation
 
-`$ go get github.com/kkyr/bingo`
+`$ go get github.com/armsofter/bingo`
 
 # Usage
 
